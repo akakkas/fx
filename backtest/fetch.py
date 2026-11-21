@@ -51,8 +51,8 @@ def parse(raw, day):
     n = len(buf) // 24
     if n == 0:
         return None
-    arr = np.frombuffer(buf[: n * 24], dtype=">i4").reshape(n, 6)
-    vol = np.frombuffer(buf[: n * 24], dtype=">f4").reshape(n, 6)[:, 5]
+    arr = np.frombuffer(buf[: n * 24], dtype=">i4").reshape(n, 6).astype(np.int64)
+    vol = np.frombuffer(buf[: n * 24], dtype=">f4").reshape(n, 6)[:, 5].astype(np.float64)
     base = pd.Timestamp(day, tz="UTC")
     idx = base + pd.to_timedelta(arr[:, 0], unit="s")
     # sıra: open, close, low, high
