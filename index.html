@@ -119,6 +119,24 @@ function tzOffMin(tz,ms){var p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,h
  var asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour%24,+p.minute,+p.second);return (asUTC-ms)/60000}
 function zoned(tz,hhmm,refMs){var p={};new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(refMs)).forEach(function(x){p[x.type]=x.value});
  var h=hhmm.split(':');var guess=Date.UTC(+p.year,+p.month-1,+p.day,+h[0],+h[1]);return guess-tzOffMin(tz,guess)*60000}
+/* ---------- haber takvimi (resmi takvimlerden: federalreserve.gov, bls.gov, ECB) ---------- */
+var NY='America/New_York',FR='Europe/Berlin',ALL=['XAU','XAG','DAX','NAS'];
+var HABER=[].concat(
+ ['2026-12-09','2027-01-27','2027-03-17','2027-04-28','2027-06-09','2027-07-28','2027-09-15','2027-11-17'].map(function(d){return{d:d,h:'14:00',tz:NY,ad:'Fed faiz kararı',on:30,son:60,etk:ALL}}),
+ ['2026-12-10','2027-01-13','2027-02-11','2027-03-10','2027-04-13','2027-07-14'].map(function(d){return{d:d,h:'08:30',tz:NY,ad:'ABD enflasyon (CPI)',on:30,son:30,etk:ALL}}),
+ ['2026-12-04','2027-01-08','2027-02-05','2027-04-02','2027-07-02'].map(function(d){return{d:d,h:'08:30',tz:NY,ad:'ABD istihdam (NFP)',on:30,son:30,etk:ALL}}),
+ [{d:'2026-12-17',h:'13:45',tz:FR,ad:'ECB faiz kararı',on:30,son:90,etk:['DAX']}]
+).map(function(e){e.t=zoned(e.tz,e.h,Date.parse(e.d+'T12:00:00Z'));return e}).sort(function(a,b){return a.t-b.t});
+function trGun(ms){return new Date(ms).toLocaleDateString('tr-TR',{timeZone:'Europe/Istanbul'})}
+function haberEngel(inst,ms){return HABER.find(function(e){return e.etk.indexOf(inst)>=0&&ms>=e.t-e.on*60000&&ms<=e.t+e.son*60000})}
+function haberBugun(inst,ms){return HABER.filter(function(e){return (!inst||e.etk.indexOf(inst)>=0)&&trGun(e.t)===trGun(ms)})}
+function hTR(ms){return new Date(ms).toLocaleTimeString('tr-TR',{timeZone:'Europe/Istanbul',hour:'2-digit',minute:'2-digit'})}
+function vHaber(){var now=Date.now(),up=HABER.filter(function(e){return e.t+e.son*60000>=now}).slice(0,5);
+ if(!up.length)return '<h2>Haber takvimi</h2><div class="card empty">Takvim bitti, güncellenmesi lazım.</div>';
+ return '<h2>Haber takvimi<span class="sm mut">sinyal kapalı: ±30 dk</span></h2><div class="card" style="padding:4px 14px">'+up.map(function(e){
+  var act=now>=e.t-e.on*60000&&now<=e.t+e.son*60000,bug=trGun(e.t)===trGun(now);
+  return '<div class="li"><span><b'+(bug?' class="dn"':'')+'>'+e.ad+'</b><br><span class="sm mut">'+(e.etk.length<4?e.etk.map(function(k){return INST[k].ad}).join(', '):'Tümü')+'</span></span><span style="text-align:right">'+
+   (act?'<b class="dn">ŞİMDİ · sinyal kapalı</b>':bug?'<b class="dn">BUGÜN '+hTR(e.t)+'</b>':new Date(e.t).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',day:'numeric',month:'short',weekday:'short',hour:'2-digit',minute:'2-digit'}))+'</span></div>'}).join('')+'</div>'}
 function lot(inst,entry,stop,riskUsd){var d=Math.abs(entry-stop);if(!(d>0))return null;var c=S.contract[inst]||INST[inst].contract;var fx=INST[inst].ccy==='EUR'?S.eurusd:1;
  var raw=riskUsd/(d*c*fx);var l=Math.floor(raw*100)/100;return{lot:l,real:l*d*c*fx,margin:l*c*entry*fx/100,perPoint:l*c*fx}}
 
@@ -176,7 +194,9 @@ async function poll(force){
    if(!o||o.status==='error'||!o.values){if(o&&o.message)toast('Veri hatası: '+o.message.slice(0,60));return}
    var b5=o.values.map(function(v){return{t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}});
    BARS[k]=b5;S.bars[k]=b5.map(function(x){return[x.t,x.o,x.h,x.l,x.c]});var last=b5[b5.length-1];S.prices[k]={p:last.c,ch:b5.length>288?(last.c/b5[b5.length-289].c-1)*100:null,t:last.t};
-   detect(k,b5,now).forEach(function(s){if(!S.signals.some(function(x){return x.id===s.id})){S.signals.unshift(s);fresh.push(s)}});
+   detect(k,b5,now).forEach(function(s){if(!S.signals.some(function(x){return x.id===s.id})){var hb=haberEngel(s.inst,s.t);
+    if(hb){s.st='haber';s.hab=hb.ad}else{var bg=haberBugun(s.inst,s.t);if(bg.length)s.hgun=bg.map(function(e){return e.ad+' '+hTR(e.t)}).join(', ')}
+    S.signals.unshift(s);if(!hb)fresh.push(s)}});
   });
   S.signals=S.signals.slice(0,200);S.lastFetch=now;save();
   fresh.forEach(notify);render();
@@ -187,7 +207,7 @@ function schedule(){var now=Date.now(),next=Math.ceil((now+1)/300000)*300000+250
 
 /* ---------- bildirim ---------- */
 function beep(){try{var c=new(window.AudioContext||window.webkitAudioContext)();[0,0.18].forEach(function(dl){var o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(0.2,c.currentTime+dl);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dl+0.15);o.start(c.currentTime+dl);o.stop(c.currentTime+dl+0.16)})}catch(e){}}
-function notify(s){var l=lot(s.inst,s.entry,s.stop,S.risk);var txt=INST[s.inst].ad+' · '+s.type+' · '+(s.side==='L'?'AL ':'SAT ')+px(s.inst,s.entry)+' · Stop '+px(s.inst,s.stop)+(l?' · Lot '+l.lot.toFixed(2):'');
+function notify(s){var l=lot(s.inst,s.entry,s.stop,S.risk);var txt=(s.hgun?'⚠️ Bugün '+s.hgun+' · ':'')+INST[s.inst].ad+' · '+s.type+' · '+(s.side==='L'?'AL ':'SAT ')+px(s.inst,s.entry)+' · Stop '+px(s.inst,s.stop)+(l?' · Lot '+l.lot.toFixed(2):'');
  beep();try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}
  try{if('Notification' in window&&Notification.permission==='granted'){if(navigator.serviceWorker&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(function(r){r.showNotification('🎯 Tetik: '+INST[s.inst].ad+' '+(s.side==='L'?'AL':'SAT'),{body:txt,tag:s.id,icon:'icon-192.png',badge:'icon-192.png',data:{id:s.id}})})}else new Notification('Tetik',{body:txt})}}catch(e){}
  toast('🎯 '+txt)}
@@ -232,18 +252,22 @@ function sessions(){var now=Date.now(),out=[];SESS.forEach(function(s){var a=zon
  var us=zoned('America/New_York','08:30',now);if(now<us&&us-now<6*3600000){var m=Math.round((us-now)/60000);out.push('<span class="chip w">'+hm(new Date(us))+' ABD verisi · '+(m>59?Math.floor(m/60)+'s ':'')+(m%60)+'dk</span>')}
  return out.join('')||'<span class="chip">Piyasalar kapalı</span>'}
 function sigCard(s,i){var l=lot(s.inst,s.entry,s.stop,S.risk),isNew=s.st==='yeni'&&Date.now()-s.t<45*60000;
- var stt=s.st==='açıldı'?'<span class="sm acc">açıldı</span>':s.st==='pas'?'<span class="sm mut">pas</span>':isNew?'<span class="sm acc" style="font-weight:700">YENİ · '+hm(new Date(s.t))+'</span>':'<span class="sm mut">'+new Date(s.t).toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</span>';
+ var stt=s.st==='haber'?'<span class="sm dn">⛔ haber: '+esc(s.hab||'')+'</span>':s.st==='açıldı'?'<span class="sm acc">açıldı</span>':s.st==='pas'?'<span class="sm mut">pas</span>':isNew?'<span class="sm acc" style="font-weight:700">YENİ · '+hm(new Date(s.t))+'</span>':'<span class="sm mut">'+new Date(s.t).toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</span>';
  return '<div class="card sig'+(isNew?' new':'')+'" data-sig="'+esc(s.id)+'"><div class="row" style="margin-bottom:8px"><div class="row" style="justify-content:flex-start"><span class="tag '+s.side+'">'+(s.side==='L'?'▲ AL':'▼ SAT')+'</span><b>'+INST[s.inst].ad+'</b><span class="typ">'+s.type+'</span></div>'+stt+'</div>'+
- '<div class="g4 sm"><div class="kv"><span class="mut">Giriş</span><b>'+px(s.inst,s.entry)+'</b></div><div class="kv"><span class="mut">Stop</span><b class="dn">'+px(s.inst,s.stop)+'</b></div><div class="kv"><span class="mut">Hedef</span><b class="up">'+px(s.inst,s.tp1)+'</b></div><div class="kv"><span class="mut">Lot</span><b class="acc">'+(l?l.lot.toFixed(2):'—')+'</b></div></div></div>'}
+ (s.hgun&&s.st!=='haber'?'<div class="sm dn" style="margin:-2px 0 8px">⚠️ Bugün '+esc(s.hgun)+' (TR saati)</div>':'')+'<div class="g4 sm"><div class="kv"><span class="mut">Giriş</span><b>'+px(s.inst,s.entry)+'</b></div><div class="kv"><span class="mut">Stop</span><b class="dn">'+px(s.inst,s.stop)+'</b></div><div class="kv"><span class="mut">Hedef</span><b class="up">'+px(s.inst,s.tp1)+'</b></div><div class="kv"><span class="mut">Lot</span><b class="acc">'+(l?l.lot.toFixed(2):'—')+'</b></div></div></div>'}
 function vAna(){var eq=equity(),tp=todayPnl(),loss=Math.max(0,-tp),orisk=openRisk();
  var h='<div class="card"><div class="row" style="align-items:flex-end"><div><div class="sm mut">Kasa</div><div class="big">'+usd(eq)+'</div></div><div style="text-align:right"><div class="sm mut">Bugün</div><div style="font-size:18px;font-weight:700" class="'+(tp>=0?'up':'dn')+'">'+(tp>=0?'▲ +':'▼ ')+usd(tp).replace('−','−')+'</div></div></div>'+
  '<div class="row sm mut" style="margin:12px 0 6px"><span>Günlük kayıp sınırı</span><span>'+usd(loss)+' / '+usd(S.limit)+'</span></div><div class="bar"><i style="width:'+Math.min(100,loss/S.limit*100)+'%;'+(loss>=S.limit?'background:#ef5d4c':'')+'"></i></div>'+
  '<div class="row" style="margin-top:10px;font-size:13px"><span class="mut">Açık risk</span><span>'+openTrades().length+' pozisyon · '+usd(orisk)+'</span></div></div>';
  if(loss>=S.limit)h+='<div class="warn">Günlük kayıp sınırına ulaştın. Bugünlük bitti; yarın taze kafayla.</div>';
+ var hb0=HABER.find(function(e){return Date.now()>=e.t-e.on*60000&&Date.now()<=e.t+e.son*60000}),bg0=haberBugun(null,Date.now());
+ if(hb0)h+='<div class="warn">⛔ Şu an '+hb0.ad+' penceresi: '+(hb0.etk.length<4?hb0.etk.map(function(k){return INST[k].ad}).join(', '):'tüm enstrümanlarda')+' sinyal kapalı.</div>';
+ else if(bg0.length)h+='<div class="warn">⚠️ Bugün '+bg0.map(function(e){return e.ad+' '+hTR(e.t)}).join(' · ')+'. Haber öncesi ve sonrası yarım saat sinyal gelmez; o saatlerde fiyat iğne atar, stoplar kolay patlar.</div>';
  h+='<div class="chips">'+sessions()+'</div>';
  if(!S.apiKey)h+='<div class="warn">Canlı sinyal için Ayarlar\'dan ücretsiz Twelve Data anahtarını gir.</div>';
  var list=S.signals.slice(0,4);
  h+='<h2>Son sinyaller<a href="#" data-go="sinyal" class="sm acc" style="text-decoration:none">Tümü</a></h2>'+(list.length?list.map(sigCard).join(''):'<div class="card empty">Henüz sinyal yok. Açık sinyal türlerin: '+(activeList()||'hiçbiri')+'</div>');
+ h+=vHaber();
  h+='<h2>Piyasalar<span class="sm mut">'+(S.lastFetch?'son: '+hm(new Date(S.lastFetch)):'')+'</span></h2><div class="card" style="padding:4px 14px">'+Object.keys(INST).map(function(k){var p=S.prices[k];
   return '<div class="li"><b>'+INST[k].ad+'</b><span>'+(p?px(k,p.p)+(p.ch!=null?' <span class="sm '+(p.ch>=0?'up':'dn')+'">'+(p.ch>=0?'▲ ':'▼ ')+nf(Math.abs(p.ch),1)+'%</span>':''):INST[k].feed?'<span class="mut sm">—</span>':'<span class="mut sm">canlı veri yok</span>')+'</span></div>'}).join('')+'</div>';
  return h}
@@ -336,7 +360,7 @@ async function shareBackup(){var blob=new Blob([JSON.stringify({app:'fxtetik',at
 document.querySelectorAll('nav button').forEach(function(b){b.onclick=function(){tab=b.dataset.t;render();window.scrollTo(0,0)}});
 document.addEventListener('visibilitychange',function(){if(!document.hidden){poll();render()}});
 try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
-window.__fx={poll:poll,detect:detect,lot:lot,S:function(){return S},zoned:zoned};
+window.__fx={HABER:HABER,haberEngel:haberEngel,poll:poll,detect:detect,lot:lot,S:function(){return S},zoned:zoned};
 render();poll();schedule();setInterval(function(){if(tab==='ana')render()},60000);
 })();
 </script>
