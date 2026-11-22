@@ -26,7 +26,7 @@ URL = "https://datafeed.dukascopy.com/datafeed/{s}/{y}/{m:02d}/{d:02d}/{side}_ca
 OUT = os.path.join(os.path.dirname(__file__), "data")
 
 
-def get(url, tries=3):
+def get(url, tries=5):
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -35,9 +35,9 @@ def get(url, tries=3):
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return b""
-            time.sleep(1 + i * 2)
+            time.sleep(2 ** i)
         except Exception:
-            time.sleep(1 + i * 2)
+            time.sleep(2 ** i)
     return None
 
 
@@ -92,37 +92,57 @@ def scale(df, lo, hi):
     raise ValueError(f"ölçek bulunamadı, medyan={med}")
 
 
+BUDGET = float(os.environ.get("BUDGET_MIN", "95")) * 60
+WORKERS = int(os.environ.get("WORKERS", "4"))
+
+
 def main(symbols):
+    """Eksik günleri tamamlar; mevcut yıllık dosyalara ekler. Süre bütçesi dolunca kaydedip çıkar."""
     os.makedirs(OUT, exist_ok=True)
+    T0 = time.time()
     days = [START + dt.timedelta(days=i) for i in range((END - START).days + 1)]
     days = [d for d in days if d.weekday() < 5]
     years = sorted({d.year for d in days})
     for sym in symbols:
-        k = None
         for y in years:
             path = os.path.join(OUT, f"{sym}_{y}.parquet")
-            if os.path.exists(path) and y != END.year:
-                print(sym, y, "önbellekte", flush=True)
+            emp_path = os.path.join(OUT, f"{sym}_{y}.empty")
+            old = pd.read_parquet(path) if os.path.exists(path) else None
+            have = set(old.index.date) if old is not None else set()
+            empty = set(open(emp_path).read().split()) if os.path.exists(emp_path) else set()
+            todo = [d for d in days if d.year == y and d not in have and d.isoformat() not in empty]
+            if not todo:
+                print(sym, y, "tamam", flush=True)
                 continue
-            yd = [d for d in days if d.year == y]
-            parts, stats = [], {"ok": 0, "empty": 0, "err": 0}
-            t0 = time.time()
-            with cf.ThreadPoolExecutor(24) as ex:
-                for i, (day, df, st) in enumerate(ex.map(lambda d: fetch_day(sym, d), yd)):
+            parts, stats, t0 = [], {"ok": 0, "empty": 0, "err": 0}, time.time()
+            with cf.ThreadPoolExecutor(WORKERS) as ex:
+                futs = {ex.submit(fetch_day, sym, d): d for d in todo}
+                for i, f in enumerate(cf.as_completed(futs)):
+                    day, df, st = f.result()
                     stats[st] += 1
+                    if st == "empty":
+                        empty.add(day.isoformat())
                     if df is not None and len(df):
                         parts.append(df)
                     if (i + 1) % 50 == 0:
-                        print(f"  {sym} {y}: {i+1}/{len(yd)} gün {stats} {time.time()-t0:.0f} sn", flush=True)
-            if not parts:
-                print(sym, y, "veri yok", stats, flush=True)
-                continue
-            full = pd.concat(parts).sort_index()
-            k = k or scale(full, *SYMBOLS[sym])
-            for c in ["bo", "bh", "bl", "bc", "ao", "ah", "al", "ac"]:
-                full[c] = full[c].astype(float) / k
-            full.to_parquet(path)
-            print(f"{sym} {y}: {len(full)} dakika, ölçek={k}, {stats}, {time.time()-t0:.0f} sn", flush=True)
+                        print(f"  {sym} {y}: {i+1}/{len(todo)} {stats} {time.time()-t0:.0f} sn", flush=True)
+                    if time.time() - T0 > BUDGET:
+                        print("süre bütçesi doldu, kaydediliyor", flush=True)
+                        for g in futs:
+                            g.cancel()
+                        break
+            open(emp_path, "w").write("\n".join(sorted(empty)))
+            if parts:
+                new = pd.concat(parts).sort_index()
+                k = scale(new, *SYMBOLS[sym])
+                for c in ["bo", "bh", "bl", "bc", "ao", "ah", "al", "ac"]:
+                    new[c] = new[c].astype(float) / k
+                full = pd.concat([old, new]).sort_index() if old is not None else new
+                full = full[~full.index.duplicated()]
+                full.to_parquet(path)
+                print(f"{sym} {y}: +{len(new)} dakika (toplam {len(full)}), {stats}, {time.time()-t0:.0f} sn", flush=True)
+            if time.time() - T0 > BUDGET:
+                return
 
 
 if __name__ == "__main__":

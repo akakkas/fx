@@ -26,6 +26,7 @@ jobs:
           restore-keys: duka-${{ matrix.sym }}-
       - name: Veri indir
         run: python backtest/fetch.py ${{ matrix.sym }}
+        env: {WORKERS: "4", BUDGET_MIN: "100"}
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -50,8 +51,10 @@ jobs:
           pattern: veri-*
           path: backtest/data
           merge-multiple: true
-      - name: Geri test
+      - name: Geri test (ORB)
         run: python backtest/backtest.py
+      - name: Geri test (BBO + ST)
+        run: python backtest/strat.py
       - name: Sonuçları kaydet
         run: |
           git config user.name "fx-bot"
