@@ -82,7 +82,7 @@ var INST={
 };
 var TYPES=['BBO','ST','ORB'];
 /* 6 yıllık geri test, işlem başı net R (spread+kayma düşülmüş). null = test sürüyor */
-var KARNE={XAU:{BBO:null,ST:null,ORB:0.04},XAG:{BBO:null,ST:null,ORB:-0.19},DAX:{BBO:null,ST:null,ORB:-0.04},NAS:{BBO:null,ST:null,ORB:-0.01}};
+var KARNE={XAU:{BBO:-0.10,ST:-0.06,ORB:0.04},XAG:{BBO:-0.30,ST:-0.15,ORB:-0.19},DAX:{BBO:0.03,ST:0.03,ORB:-0.04},NAS:{BBO:-0.04,ST:-0.01,ORB:-0.01}};
 /* ORB pencereleri (borsa yerel saati) */
 var ORBW={XAU:['America/New_York','09:30'],XAG:['America/New_York','09:30'],DAX:['Europe/Berlin','09:00'],NAS:['America/New_York','09:30']};
 var SESS=[['Asya','Asia/Tokyo','09:00','18:00'],['Londra','Europe/London','08:00','16:30'],['Xetra','Europe/Berlin','09:00','17:30'],['New York','America/New_York','09:30','16:00']];
@@ -220,7 +220,7 @@ function sigSheet(id){var s=S.signals.find(function(x){return x.id===id});if(!s)
  '<p class="mut sm" style="margin:0 0 12px">'+esc(s.why)+'</p>'+
  '<div class="g3" style="margin-bottom:10px"><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Giriş</span><b style="font-size:18px">'+px(s.inst,s.entry)+'</b></div><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Stop</span><b style="font-size:18px" class="dn">'+px(s.inst,s.stop)+'</b></div><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Hedef 1R</span><b style="font-size:18px" class="up">'+px(s.inst,s.tp1)+'</b></div></div>'+
  (l?'<div class="res"><div class="row"><div><div class="sm" style="color:var(--warn)">Açılacak lot</div><div class="big">'+l.lot.toFixed(2)+'</div></div><div style="text-align:right;font-size:13px;line-height:1.7">Risk <b>'+usd(l.real)+'</b><br><span class="mut">Teminat ~'+usd(l.margin)+'</span><br><span class="mut">1 birim = '+nf(l.perPoint,2)+' $</span></div></div></div>':'<div class="warn">Stop çok yakın, lot hesaplanamadı.</div>')+
- '<div class="card"><div class="row"><b>'+s.type+' karnesi · '+INST[s.inst].ad+'</b><span class="sm '+(k==null?'mut':k>=0.1?'up':'dn')+'">'+(k==null?'test sürüyor':(k>=0?'+':'−')+nf(Math.abs(k),2)+'R / işlem')+'</span></div><div class="sm mut" style="margin-top:4px">6 yıllık test, spread ve kayma düşülmüş.'+(k!=null&&k<0.1?' Testte kazandırmadı.':'')+'</div></div>'+
+ '<div class="card"><div class="row"><b>'+s.type+' karnesi · '+INST[s.inst].ad+'</b><span class="sm '+(k==null?'mut':k>=0.1?'up':'dn')+'">'+(k==null?'test sürüyor':(k>=0?'+':'−')+nf(Math.abs(k),2)+'R / işlem')+'</span></div><div class="sm mut" style="margin-top:4px">2021-2026 testi (verinin ~%40'ı), spread ve kayma düşülmüş.'+(k!=null&&k<0.1?' Testte kazandırmadı.':'')+'</div></div>'+
  (s.st==='yeni'?'<div class="row" style="gap:10px"><button class="btn" id="sOpen" style="flex:1">Açtım, günlüğe yaz</button><button class="btn sec" id="sPass" style="width:110px">Pas geç</button></div>':'<button class="btn sec" id="sClose">Kapat</button>'));
  var o=$('sOpen');if(o)o.onclick=function(){s.st='açıldı';S.journal.unshift({id:Date.now().toString(36),inst:s.inst,type:s.type,side:s.side,entry:s.entry,stop:s.stop,lot:l?l.lot:0,openedAt:Date.now(),exit:null,pnl:0});save();closeSheet();render();toast('Günlüğe yazıldı')};
  var p=$('sPass');if(p)p.onclick=function(){s.st='pas';save();closeSheet();render()};
