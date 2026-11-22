@@ -246,7 +246,7 @@ function vGrafik(){var seg=function(attr,items,cur){return '<div class="seg" sty
  '<div class="chartbox" id="gchart"></div></div>'+tvLink(gopt.inst)+'<div class="sm mut" style="margin:0 4px 12px">DAX ve Nasdaq için canlı veri yok; TradingView düğmesini kullan: '+['DAX','NAS'].map(function(k){return '<a href="https://www.tradingview.com/chart/?symbol='+encodeURIComponent(TV[k])+'" target="_blank" rel="noopener" class="acc">'+INST[k].ad+'</a>'}).join(' · ')+'</div>'}
 
 /* ---------- görünümler ---------- */
-var tab='ana',calc={inst:'XAU',side:'L',entry:'',stop:''};
+var tab='ana',calc={inst:'XAU',side:'L',entry:'',stop:'',hedef:'',lotM:''};
 function sessions(){var now=Date.now(),out=[];SESS.forEach(function(s){var a=zoned(s[1],s[2],now),b=zoned(s[1],s[3],now);var d=new Date(now);if(d.getUTCDay()===0||d.getUTCDay()===6)return;
  if(now>=a&&now<b)out.push('<span class="chip on">● '+s[0]+' açık</span>');else if(now<a&&a-now<4*3600000)out.push('<span class="chip">'+s[0]+' '+hm(new Date(a))+'</span>')});
  var us=zoned('America/New_York','08:30',now);if(now<us&&us-now<6*3600000){var m=Math.round((us-now)/60000);out.push('<span class="chip w">'+hm(new Date(us))+' ABD verisi · '+(m>59?Math.floor(m/60)+'s ':'')+(m%60)+'dk</span>')}
@@ -286,17 +286,30 @@ function sigSheet(id){var s=S.signals.find(function(x){return x.id===id});if(!s)
  var o=$('sOpen');if(o)o.onclick=function(){s.st='açıldı';S.journal.unshift({id:Date.now().toString(36),inst:s.inst,type:s.type,side:s.side,entry:s.entry,stop:s.stop,lot:l?l.lot:0,openedAt:Date.now(),exit:null,pnl:0});save();closeSheet();render();toast('Günlüğe yazıldı')};
  var p=$('sPass');if(p)p.onclick=function(){s.st='pas';save();closeSheet();render()};
  var c=$('sClose');if(c)c.onclick=closeSheet}
-function vHesap(){var c=calc,l=null,e=num(c.entry),st=num(c.stop);if(isFinite(e)&&isFinite(st))l=lot(c.inst,e,st,S.risk);
+function vHesap(){var c=calc,l=null,e=num(c.entry),st=num(c.stop),hd=num(c.hedef),lm=num(c.lotM);
+ if(!isFinite(e)&&S.prices[c.inst])e=S.prices[c.inst].p;
+ var ctr=S.contract[c.inst]||INST[c.inst].contract,fxr=INST[c.inst].ccy==='EUR'?S.eurusd:1,sg=c.side==='L'?1:-1;
+ if(isFinite(e)&&isFinite(st))l=lot(c.inst,e,st,S.risk);
+ var L=isFinite(lm)&&lm>0?lm:(l?l.lot:NaN),pp=isFinite(L)?L*ctr*fxr:NaN;
  var corr=openTrades().filter(function(j){return j.side===c.side&&((['XAU','XAG'].indexOf(j.inst)>=0&&['XAU','XAG'].indexOf(c.inst)>=0)||(['DAX','NAS'].indexOf(j.inst)>=0&&['DAX','NAS'].indexOf(c.inst)>=0))});
  var orisk=openRisk();
  var h='<h2>Lot hesaplayıcı</h2><div class="card"><div class="seg" style="grid-template-columns:repeat(4,1fr)">'+Object.keys(INST).map(function(k){return '<button data-ci="'+k+'" class="'+(c.inst===k?'on':'')+'">'+INST[k].ad+'</button>'}).join('')+'</div>'+
  '<div class="seg" style="grid-template-columns:1fr 1fr"><button data-cs="L" class="'+(c.side==='L'?'onL':'')+'">▲ Al</button><button data-cs="S" class="'+(c.side==='S'?'onS':'')+'">▼ Sat</button></div>'+
- '<div class="g2"><label>Giriş<input id="cE" inputmode="decimal" value="'+esc(c.entry)+'" placeholder="'+(S.prices[c.inst]?px(c.inst,S.prices[c.inst].p):'fiyat')+'"></label><label>Stop<input id="cS" inputmode="decimal" value="'+esc(c.stop)+'"></label></div>'+
+ '<div class="g2"><label>Giriş<input id="cE" inputmode="decimal" value="'+esc(c.entry)+'" placeholder="'+(S.prices[c.inst]?px(c.inst,S.prices[c.inst].p)+' (şimdi)':'fiyat')+'"></label><label>Stop<input id="cS" inputmode="decimal" value="'+esc(c.stop)+'" placeholder="zarar kes"></label></div>'+
+ '<div class="g2"><label>Hedef (isteğe bağlı)<input id="cH" inputmode="decimal" value="'+esc(c.hedef)+'" placeholder="kâr al"></label><label>Lot (isteğe bağlı)<input id="cL" inputmode="decimal" value="'+esc(c.lotM)+'" placeholder="boşsa riskten"></label></div>'+
  '<div class="sm mut">İşlem başı risk: <b style="color:var(--ink)">'+usd(S.risk)+'</b> · Ayarlar\'dan değişir</div></div>';
  if(l){var sg=c.side==='L'?1:-1;h+='<div class="res"><div class="row" style="align-items:flex-end"><div><div class="sm" style="color:var(--warn)">Açılacak lot</div><div class="big">'+l.lot.toFixed(2)+'</div></div><div style="text-align:right" class="sm"><span style="color:var(--warn)">Stop mesafesi</span><div style="font-size:18px;font-weight:700">'+px(c.inst,Math.abs(e-st))+'</div></div></div>'+
   '<div class="g3 sm" style="margin-top:10px;color:var(--warn)"><div class="kv">Gerçek risk<b style="color:var(--ink)">'+usd(l.real)+'</b></div><div class="kv">Teminat<b style="color:var(--ink)">'+usd(l.margin)+'</b></div><div class="kv">1R hedef<b class="up">'+px(c.inst,e+sg*Math.abs(e-st))+'</b></div></div>'+
   ((st-e)*sg>=0?'<div class="warn" style="margin:10px 0 0">Stop yanlış tarafta: '+(c.side==='L'?'alışta stop girişin altında':'satışta stop girişin üstünde')+' olmalı.</div>':'')+(l.lot<0.01?'<div class="warn" style="margin:10px 0 0">Stop çok uzak: bu riskle en küçük lot bile açılamıyor.</div>':'')+'</div>'}
- else h+='<div class="card empty">Giriş ve stop gir, lot burada çıkar.</div>';
+ if(isFinite(pp)&&isFinite(e)){var tem=L*ctr*e*fxr/100,bos=S.kasa-tem,mc=bos/pp,rk=isFinite(st)?(e-st)*sg*pp:NaN,kz=isFinite(hd)?(hd-e)*sg*pp:NaN;
+  h+='<div class="card"><div class="sm mut" style="margin-bottom:6px">'+nf(L,2)+' lot'+(isFinite(lm)&&lm>0?' (elle)':'')+' · fiyatta her 1 birim = '+usd(pp)+'</div>'+
+  (isFinite(kz)?'<div class="li"><span>Hedefte ('+px(c.inst,hd)+')</span><b class="'+(kz>=0?'up':'dn')+'">'+(kz>=0?'+':'')+usd(kz)+'</b></div>':'')+
+  (isFinite(rk)&&rk>0?'<div class="li"><span>Stopta ('+px(c.inst,st)+')</span><b class="dn">−'+usd(rk)+'</b></div>':'')+
+  (isFinite(kz)&&isFinite(rk)&&rk>0?'<div class="li"><span>Kazanç / risk</span><b>'+nf(kz/rk,1)+'R</b></div>':'')+
+  '<div class="li"><span>Teminat</span><b>'+usd(tem)+'</b></div>'+
+  (bos<=0?'<div class="warn" style="margin:8px 0 0">Kasa bu lotun teminatına yetmiyor.</div>':'<div class="li"><span>Teminat çağrısına mesafe</span><b class="'+(isFinite(rk)&&rk>bos?'dn':'')+'">'+px(c.inst,mc)+' ('+(sg>0?px(c.inst,e-mc)+' altı':px(c.inst,e+mc)+' üstü')+')</b></div>')+
+  (isFinite(rk)&&rk>bos&&bos>0?'<div class="warn" style="margin:8px 0 0">Stop, teminat çağrısından daha uzakta: stopa varmadan aracı kurum pozisyonu kapatır.</div>':'')+'</div>'}
+ if(!l&&!(isFinite(pp)&&isFinite(e)))h+='<div class="card empty">Stop gir, lot burada çıkar. Giriş boşsa şimdiki fiyat kullanılır. Hedef ve lot yazarsan kâr ve teminat da çıkar.</div>';
  h+='<div class="card"><div class="row" style="font-size:14px"><b>Toplam açık risk</b><span>'+usd(orisk)+' / '+usd(S.openLimit)+'</span></div><div class="bar" style="margin-top:8px"><i style="width:'+Math.min(100,orisk/S.openLimit*100)+'%"></i></div>'+
  (corr.length?'<div class="warn" style="margin:10px 0 0">'+corr.map(function(j){return INST[j.inst].ad}).join(', ')+' tarafında aynı yönde açık pozisyon var. Bu ikili birlikte hareket eder, risk fiilen katlanır.</div>':'')+'</div>'+
  (l&&l.lot>=0.01?'<button class="btn" id="cOpen">Bu işlemi açtım, günlüğe yaz</button>':'')+
@@ -341,8 +354,8 @@ function bind(){var m=$('main');
  m.querySelectorAll('[data-go]').forEach(function(e){e.onclick=function(ev){ev.preventDefault();tab=e.dataset.go;render()}});
  m.querySelectorAll('[data-ci]').forEach(function(e){e.onclick=function(){calc.inst=e.dataset.ci;calc.entry='';calc.stop='';render()}});
  m.querySelectorAll('[data-cs]').forEach(function(e){e.onclick=function(){calc.side=e.dataset.cs;render()}});
- ['cE','cS'].forEach(function(id){var e=$(id);if(e)e.onchange=function(){calc[id==='cE'?'entry':'stop']=e.value;render()}});
- var co=$('cOpen');if(co)co.onclick=function(){var e=num(calc.entry),st=num(calc.stop),l=lot(calc.inst,e,st,S.risk);S.journal.unshift({id:Date.now().toString(36),inst:calc.inst,type:'Elle',side:calc.side,entry:e,stop:st,lot:l.lot,openedAt:Date.now(),exit:null,pnl:0});save();toast('Günlüğe yazıldı');tab='gunluk';render()};
+ var CM={cE:'entry',cS:'stop',cH:'hedef',cL:'lotM'};Object.keys(CM).forEach(function(id){var e=$(id);if(e)e.onchange=function(){calc[CM[id]]=e.value;render()}});
+ var co=$('cOpen');if(co)co.onclick=function(){var e=num(calc.entry);if(!isFinite(e)&&S.prices[calc.inst])e=S.prices[calc.inst].p;var st=num(calc.stop),l=lot(calc.inst,e,st,S.risk),lm=num(calc.lotM);S.journal.unshift({id:Date.now().toString(36),inst:calc.inst,type:'Elle',side:calc.side,entry:e,stop:st,lot:isFinite(lm)&&lm>0?lm:l.lot,openedAt:Date.now(),exit:null,pnl:0});save();toast('Günlüğe yazıldı');tab='gunluk';render()};
  m.querySelectorAll('[data-on]').forEach(function(e){e.onclick=function(){var p=e.dataset.on.split('.');S.on[p[0]][p[1]]=!S.on[p[0]][p[1]];save();render();if(S.on[p[0]][p[1]]&&KARNE[p[0]][p[1]]!=null&&KARNE[p[0]][p[1]]<0.1)toast(p[1]+' testte '+INST[p[0]].ad+'da kazandırmadı');}});
  m.querySelectorAll('[data-set]').forEach(function(e){e.onchange=function(){var v=num(e.value);if(!isFinite(v))return toast('Sayı gir');S[e.dataset.set]=v;save();toast('Kaydedildi')}});
  m.querySelectorAll('[data-con]').forEach(function(e){e.onchange=function(){var v=num(e.value);if(!(v>0))return toast('Sayı gir');S.contract[e.dataset.con]=v;save();toast('Kaydedildi')}});
