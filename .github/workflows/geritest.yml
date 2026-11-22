@@ -1,8 +1,6 @@
 name: ORB geri test
 on:
-  workflow_dispatch:
-  push:
-    paths: ["backtest/**", ".github/workflows/geritest.yml"]
+  workflow_dispatch:   # yalnız elle başlatılır; push'ta tetiklenmez (çalışan turu iptal etmesin)
 permissions:
   contents: write
 concurrency: {group: geritest, cancel-in-progress: true}
