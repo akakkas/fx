@@ -250,10 +250,12 @@ function vGrafik(){var seg=function(attr,items,cur){return '<div class="seg" sty
 
 /* ---------- görünümler ---------- */
 var tab='ana',calc={inst:'XAU',side:'L',entry:'',stop:'',hedef:'',lotM:''};
-function sessions(){var now=Date.now(),out=[];SESS.forEach(function(s){var a=zoned(s[1],s[2],now),b=zoned(s[1],s[3],now);var d=new Date(now);if(d.getUTCDay()===0||d.getUTCDay()===6)return;
+function sessions(){var now=Date.now(),out=[];SESS.forEach(function(s){var a=zoned(s[1],s[2],now),b=zoned(s[1],s[3],now);if(!piyasaAcik(now))return;
  if(now>=a&&now<b)out.push('<span class="chip on">● '+s[0]+' açık</span>');else if(now<a&&a-now<4*3600000)out.push('<span class="chip">'+s[0]+' '+hm(new Date(a))+'</span>')});
  var us=zoned('America/New_York','08:30',now);if(now<us&&us-now<6*3600000){var m=Math.round((us-now)/60000);out.push('<span class="chip w">'+hm(new Date(us))+' ABD verisi · '+(m>59?Math.floor(m/60)+'s ':'')+(m%60)+'dk</span>')}
+ if(!out.length&&piyasaAcik(now))out.push('<span class="chip on">● Altın/Gümüş açık · Asya saatleri</span>');
  return out.join('')||'<span class="chip">Piyasalar kapalı</span>'}
+function piyasaAcik(ms){var d=new Date(ms),wd=d.getUTCDay(),h=d.getUTCHours();if(wd===6||(wd===0&&h<22)||(wd===5&&h>=21))return false;var ny=zoned('America/New_York','17:00',ms);return !(ms>=ny&&ms<ny+3600000)}
 function sigCard(s,i){var l=lot(s.inst,s.entry,s.stop,S.risk),isNew=s.st==='yeni'&&Date.now()-s.t<45*60000;
  var stt=s.st==='haber'?'<span class="sm dn">⛔ haber: '+esc(s.hab||'')+'</span>':s.st==='açıldı'?'<span class="sm acc">açıldı</span>':s.st==='pas'?'<span class="sm mut">pas</span>':isNew?'<span class="sm acc" style="font-weight:700">YENİ · '+hm(new Date(s.t))+'</span>':'<span class="sm mut">'+new Date(s.t).toLocaleString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</span>';
  return '<div class="card sig'+(isNew?' new':'')+'" data-sig="'+esc(s.id)+'"><div class="row" style="margin-bottom:8px"><div class="row" style="justify-content:flex-start"><span class="tag '+s.side+'">'+(s.side==='L'?'▲ AL':'▼ SAT')+'</span><b>'+INST[s.inst].ad+'</b><span class="typ">'+s.type+'</span></div>'+stt+'</div>'+

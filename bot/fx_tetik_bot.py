@@ -161,10 +161,12 @@ def detect(inst, b5, now):
     b15 = indicators([x for x in agg(b5, 15) if x["t"] + tf <= now])
     b5c = indicators([dict(x) for x in b5 if x["t"] + 300000 <= now])
     on = ACIK[inst]
-    if len(b15) > 25:
-        r, p = b15[-1], b15[-2]
+    for j in (-1, -2, -3):  # son 3 kapanmış mum: veri gecikirse dönüş kaçmasın (aynı sinyal ID ile bir kez bildirilir)
+        if len(b15) <= 25 - j:
+            break
+        r, p = b15[j], b15[j - 1]
         close_t = r["t"] + tf
-        if now - close_t < 20 * 60000:
+        if now - close_t < 35 * 60000:
             if on["BBO"] and r.get("mid"):
                 side = "L" if (r["c"] > r["up"] and p["c"] <= p["up"]) else "S" if (r["c"] < r["dn"] and p["c"] >= p["dn"]) else None
                 if side and abs(r["c"] - r["mid"]) > 0.3 * r["atr"]:
@@ -271,7 +273,7 @@ def gerek_var(now_ms):
         o = zoned("NY", "09:30", now_ms)
         if o + 15 * 60000 <= now_ms <= o + 80 * 60000:
             return True
-    return (now_ms // 60000) % 15 < 5  # 15 dk'lık mum kapandıktan sonraki ilk tur
+    return 5 <= (now_ms // 60000) % 15 < 10  # 15 dk'lık mum kapandıktan 5 dk sonra (veri sağlayıcının gecikmesine pay)
 
 
 def tur(key, st):
