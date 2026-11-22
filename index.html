@@ -159,13 +159,12 @@ function mk(inst,type,side,entry,stop,t,why){var risk=Math.abs(entry-stop),sg=si
 
 var fetching=false;
 async function poll(force){
- if(fetching)return;var feeds=Object.keys(INST).filter(function(k){return INST[k].feed&&(TYPES.some(function(t){return S.on[k][t]})||force)});
+ if(fetching)return;var feeds=Object.keys(INST).filter(function(k){return INST[k].feed});
  if(!S.apiKey){render();return}
  var d=new Date(),wd=d.getUTCDay();if((wd===6||(wd===0&&d.getUTCHours()<22))&&!force)return;
  if(S.credits.d!==today())S.credits={d:today(),n:0};
  if(S.credits.n+feeds.length>780){toast('Günlük ücretsiz veri sınırı doldu');return}
- if(!feeds.length)feeds=['XAU'];
- fetching=true;
+  fetching=true;
  try{
   var url='https://api.twelvedata.com/time_series?interval=5min&outputsize=300&timezone=UTC&order=ASC&apikey='+encodeURIComponent(S.apiKey)+'&symbol='+feeds.map(function(k){return INST[k].feed}).join(',');
   var res=await fetch(url);var js=await res.json();S.credits.n+=feeds.length;
