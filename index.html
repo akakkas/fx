@@ -30,7 +30,7 @@ h2{font-size:16px;margin:16px 4px 8px;display:flex;justify-content:space-between
 .sig{cursor:pointer}.sig.new{border-color:var(--acc)}
 .g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .kv b{display:block;font-size:15px}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:#15181d;border-top:1px solid var(--line);padding:6px 0 calc(8px + env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(6,1fr);background:#15181d;border-top:1px solid var(--line);padding:6px 0 calc(8px + env(safe-area-inset-bottom));z-index:5}
 nav button{background:none;border:0;color:var(--mut);font:600 11px Inter,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0}
 nav button.on{color:var(--acc)}nav svg{width:22px;height:22px}
 .seg{display:grid;gap:6px;margin-bottom:12px}
@@ -50,6 +50,8 @@ input:focus,select:focus{outline:0;border-color:var(--acc)}
 .sheet{background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
 .toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px;z-index:30;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}.toast.on{opacity:1}
 .empty{text-align:center;color:var(--mut);padding:24px 8px}
+.chartbox{height:360px;border-radius:12px;overflow:hidden;background:var(--bg)}.chartbox.mini{height:230px;margin-bottom:10px}
+.tvbtn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);text-decoration:none;font-weight:600;font-size:14px;margin-bottom:10px}
 .iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);display:flex;align-items:center;justify-content:center}
 </style>
 </head>
@@ -62,6 +64,7 @@ input:focus,select:focus{outline:0;border-color:var(--acc)}
 <nav id="nav">
 <button data-t="ana" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Ana</button>
 <button data-t="sinyal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Sinyal</button>
+<button data-t="grafik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V4M4 20h16"/><path d="M8 15l4-5 3 3 5-6"/></svg>Grafik</button>
 <button data-t="hesap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>Hesap</button>
 <button data-t="gunluk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h12a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 9h7M8 13h7"/></svg>Günlük</button>
 <button data-t="ayar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Ayarlar</button>
@@ -92,7 +95,7 @@ function defaults(){return{
  kasa:5000,risk:100,limit:200,openLimit:300,srvOff:-1,apiKey:'',eurusd:1.10,
  contract:{XAU:100,XAG:5000,DAX:1,NAS:20},
  on:{XAU:{BBO:false,ST:true,ORB:false},XAG:{BBO:false,ST:false,ORB:false},DAX:{BBO:false,ST:false,ORB:false},NAS:{BBO:false,ST:false,ORB:false}},
- signals:[],journal:[],prices:{},lastFetch:0,credits:{d:'',n:0}}}
+ signals:[],journal:[],prices:{},bars:{},lastFetch:0,credits:{d:'',n:0}}}
 var S;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 S=Object.assign(defaults(),S||{});
@@ -107,7 +110,7 @@ function num(v){v=String(v==null?'':v).trim().replace(/\s|\$/g,'');if(v.indexOf(
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 var tt;function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){e.classList.remove('on')},2400)}
 function openSheet(h){$('sheet').innerHTML=h;$('sbg').classList.add('on')}
-function closeSheet(){$('sbg').classList.remove('on')}
+function closeSheet(){$('sbg').classList.remove('on');if(SCH){try{SCH.remove()}catch(e){}SCH=null}}
 $('sbg').onclick=function(e){if(e.target.id==='sbg')closeSheet()};
 function hm(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -172,7 +175,7 @@ async function poll(force){
   feeds.forEach(function(k){var o=feeds.length>1?js[INST[k].feed]:js;
    if(!o||o.status==='error'||!o.values){if(o&&o.message)toast('Veri hatası: '+o.message.slice(0,60));return}
    var b5=o.values.map(function(v){return{t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}});
-   var last=b5[b5.length-1];S.prices[k]={p:last.c,ch:b5.length>288?(last.c/b5[b5.length-289].c-1)*100:null,t:last.t};
+   BARS[k]=b5;S.bars[k]=b5.map(function(x){return[x.t,x.o,x.h,x.l,x.c]});var last=b5[b5.length-1];S.prices[k]={p:last.c,ch:b5.length>288?(last.c/b5[b5.length-289].c-1)*100:null,t:last.t};
    detect(k,b5,now).forEach(function(s){if(!S.signals.some(function(x){return x.id===s.id})){S.signals.unshift(s);fresh.push(s)}});
   });
   S.signals=S.signals.slice(0,200);S.lastFetch=now;save();
@@ -189,6 +192,38 @@ function notify(s){var l=lot(s.inst,s.entry,s.stop,S.risk);var txt=INST[s.inst].
  try{if('Notification' in window&&Notification.permission==='granted'){if(navigator.serviceWorker&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(function(r){r.showNotification('🎯 Tetik: '+INST[s.inst].ad+' '+(s.side==='L'?'AL':'SAT'),{body:txt,tag:s.id,icon:'icon-192.png',badge:'icon-192.png',data:{id:s.id}})})}else new Notification('Tetik',{body:txt})}}catch(e){}
  toast('🎯 '+txt)}
 $('bell').onclick=async function(){if(!('Notification' in window))return toast('Bu tarayıcı bildirim desteklemiyor');var p=await Notification.requestPermission();toast(p==='granted'?'Bildirimler açık':'Bildirim izni verilmedi')};
+
+
+/* ---------- grafik ---------- */
+var BARS={};Object.keys(S.bars||{}).forEach(function(k){BARS[k]=S.bars[k].map(function(a){return{t:a[0],o:a[1],h:a[2],l:a[3],c:a[4]}})});
+var TV={XAU:'OANDA:XAUUSD',XAG:'OANDA:XAGUSD',DAX:'OANDA:DE30EUR',NAS:'OANDA:NAS100USD'};
+function tvLink(inst){return '<a class="tvbtn" href="https://www.tradingview.com/chart/?symbol='+encodeURIComponent(TV[inst])+'" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>TradingView\'de aç</a>'}
+var LWC=null,CHARTS=[],SCH=null;
+function loadLWC(){if(LWC)return LWC;LWC=new Promise(function(res,rej){var sc=document.createElement('script');sc.src='https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';sc.onload=function(){res(window.LightweightCharts)};sc.onerror=function(){LWC=null;rej()};document.head.appendChild(sc)});return LWC}
+function killCharts(){CHARTS.forEach(function(c){try{c.remove()}catch(e){}});CHARTS=[]}
+var TZS=-new Date().getTimezoneOffset()*60;
+function ts(ms){return Math.floor(ms/1000)+TZS}
+function drawChart(el,inst,tf,opts){if(!el)return;var b5=BARS[inst];if(!b5||b5.length<30){el.innerHTML='<div class="empty">Grafik verisi yok. Veri anahtarı girili mi, piyasa açık mı?</div>';return}
+ loadLWC().then(function(L){if(!document.body.contains(el))return;
+  var bars=indicators(tf===15?agg(b5.map(function(x){return Object.assign({},x)}),15):b5.map(function(x){return Object.assign({},x)}));
+  if(opts.from)bars=bars.filter(function(x){return x.t>=opts.from&&x.t<=opts.to});
+  var ch=L.createChart(el,{width:el.clientWidth,height:el.clientHeight,layout:{background:{color:'#111418'},textColor:'#9aa3ad',fontSize:11},grid:{vertLines:{color:'#1b1f25'},horzLines:{color:'#1b1f25'}},rightPriceScale:{borderColor:'#2a3038'},timeScale:{borderColor:'#2a3038',timeVisible:true,secondsVisible:false},crosshair:{mode:0}});if(opts.sig){if(SCH)try{SCH.remove()}catch(e){};SCH=ch}else CHARTS.push(ch);
+  var cs=ch.addCandlestickSeries({upColor:'#3fb27f',downColor:'#ef5d4c',wickUpColor:'#3fb27f',wickDownColor:'#ef5d4c',borderVisible:false,priceFormat:{type:'price',precision:INST[inst].dec,minMove:Math.pow(10,-INST[inst].dec)}});
+  cs.setData(bars.map(function(x){return{time:ts(x.t),open:x.o,high:x.h,low:x.l,close:x.c}}));
+  var line=function(col,w,st){return ch.addLineSeries({color:col,lineWidth:w||1,lineStyle:st||0,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})};
+  if(opts.bb){var u=line('#6b8fd6'),m=line('#6b8fd6',1,2),d=line('#6b8fd6');var f=function(k){return bars.map(function(x){return x[k]!=null?{time:ts(x.t),value:x[k]}:{time:ts(x.t)}})};u.setData(f('up'));m.setData(f('mid'));d.setData(f('dn'))}
+  if(opts.st){var su=line('#3fb27f',2),sd=line('#ef5d4c',2);su.setData(bars.map(function(x){return x.dir===1?{time:ts(x.t),value:x.st}:{time:ts(x.t)}}));sd.setData(bars.map(function(x){return x.dir===-1?{time:ts(x.t),value:x.st}:{time:ts(x.t)}}))}
+  if(opts.orb){var w=ORBW[inst],o=zoned(w[0],w[1],opts.orbAt||Date.now());var rg=b5.filter(function(x){return x.t>=o&&x.t<o+15*60000});if(rg.length){var hi=Math.max.apply(null,rg.map(function(x){return x.h})),lo=Math.min.apply(null,rg.map(function(x){return x.l}));cs.createPriceLine({price:hi,color:'#f08a24',lineWidth:1,lineStyle:2,title:'ORB üst'});cs.createPriceLine({price:lo,color:'#f08a24',lineWidth:1,lineStyle:2,title:'ORB alt'})}}
+  if(opts.sig){var g=opts.sig;cs.createPriceLine({price:g.entry,color:'#eef1f4',lineWidth:1,title:'Giriş'});cs.createPriceLine({price:g.stop,color:'#ef5d4c',lineWidth:2,title:'Stop'});cs.createPriceLine({price:g.tp1,color:'#3fb27f',lineWidth:1,lineStyle:2,title:'1R'})}
+  var mk=(opts.markers||[]).map(function(g){var bt=Math.floor((g.t-1)/(tf*60000))*tf*60000;return{time:ts(bt),position:g.side==='L'?'belowBar':'aboveBar',color:g.side==='L'?'#7fe0b0':'#ffa59a',shape:g.side==='L'?'arrowUp':'arrowDown',text:g.type}}).filter(function(m){return m.time>=ts(bars[0].t)}).sort(function(a,b){return a.time-b.time});
+  if(mk.length)cs.setMarkers(mk);
+  ch.timeScale().fitContent();
+ }).catch(function(){el.innerHTML='<div class="empty">Grafik yüklenemedi (internet?)</div>'})}
+var gopt={inst:'XAU',tf:15,bb:true,st:true,orb:false};
+function vGrafik(){var seg=function(attr,items,cur){return '<div class="seg" style="grid-template-columns:repeat('+items.length+',1fr);margin-bottom:8px">'+items.map(function(it){return '<button '+attr+'="'+it[0]+'" class="'+(String(cur)===String(it[0])?'on':'')+'">'+it[1]+'</button>'}).join('')+'</div>'};
+ return '<h2>Grafik<span class="sm mut">'+(S.lastFetch?'son: '+hm(new Date(S.lastFetch)):'')+'</span></h2><div class="card">'+seg('data-gi',[['XAU','Altın'],['XAG','Gümüş']],gopt.inst)+seg('data-gt',[[5,'5 dk'],[15,'15 dk']],gopt.tf)+
+ '<div class="pick" style="margin-bottom:10px">'+[['bb','Bollinger'],['st','Supertrend'],['orb','ORB aralığı']].map(function(o){return '<button data-gx="'+o[0]+'" aria-pressed="'+gopt[o[0]]+'" class="'+(gopt[o[0]]?'on':'')+'" style="min-height:44px"><b>'+o[1]+'</b></button>'}).join('')+'</div>'+
+ '<div class="chartbox" id="gchart"></div></div>'+tvLink(gopt.inst)+'<div class="sm mut" style="margin:0 4px 12px">DAX ve Nasdaq için canlı veri yok; TradingView düğmesini kullan: '+['DAX','NAS'].map(function(k){return '<a href="https://www.tradingview.com/chart/?symbol='+encodeURIComponent(TV[k])+'" target="_blank" rel="noopener" class="acc">'+INST[k].ad+'</a>'}).join(' · ')+'</div>'}
 
 /* ---------- görünümler ---------- */
 var tab='ana',calc={inst:'XAU',side:'L',entry:'',stop:''};
@@ -218,10 +253,12 @@ function vSinyal(){return '<h2>Sinyaller<span class="sm mut">'+S.signals.length+
 function sigSheet(id){var s=S.signals.find(function(x){return x.id===id});if(!s)return;var l=lot(s.inst,s.entry,s.stop,S.risk),k=KARNE[s.inst][s.type];
  openSheet('<div class="row" style="margin-bottom:10px"><div class="row" style="justify-content:flex-start;gap:10px"><span class="tag '+s.side+'" style="font-size:15px;padding:6px 12px">'+(s.side==='L'?'▲ AL':'▼ SAT')+'</span><span style="font-size:24px;font-weight:800">'+INST[s.inst].ad+'</span></div><span class="typ" style="font-size:13px">'+s.type+' · '+(s.type==='ORB'?'5':'15')+' dk</span></div>'+
  '<p class="mut sm" style="margin:0 0 12px">'+esc(s.why)+'</p>'+
+ (BARS[s.inst]?'<div class="chartbox mini" id="schart"></div>':'')+tvLink(s.inst)+
  '<div class="g3" style="margin-bottom:10px"><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Giriş</span><b style="font-size:18px">'+px(s.inst,s.entry)+'</b></div><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Stop</span><b style="font-size:18px" class="dn">'+px(s.inst,s.stop)+'</b></div><div class="card kv" style="margin:0;background:var(--bg)"><span class="sm mut">Hedef 1R</span><b style="font-size:18px" class="up">'+px(s.inst,s.tp1)+'</b></div></div>'+
  (l?'<div class="res"><div class="row"><div><div class="sm" style="color:var(--warn)">Açılacak lot</div><div class="big">'+l.lot.toFixed(2)+'</div></div><div style="text-align:right;font-size:13px;line-height:1.7">Risk <b>'+usd(l.real)+'</b><br><span class="mut">Teminat ~'+usd(l.margin)+'</span><br><span class="mut">1 birim = '+nf(l.perPoint,2)+' $</span></div></div></div>':'<div class="warn">Stop çok yakın, lot hesaplanamadı.</div>')+
  '<div class="card"><div class="row"><b>'+s.type+' karnesi · '+INST[s.inst].ad+'</b><span class="sm '+(k==null?'mut':k>=0.1?'up':'dn')+'">'+(k==null?'test sürüyor':(k>=0?'+':'−')+nf(Math.abs(k),2)+'R / işlem')+'</span></div><div class="sm mut" style="margin-top:4px">2021-2026 testi (verinin yaklaşık yüzde 55\'i ile), spread ve kayma düşülmüş.'+(k!=null&&k<0.1?' Testte kazandırmadı.':'')+'</div></div>'+
  (s.st==='yeni'?'<div class="row" style="gap:10px"><button class="btn" id="sOpen" style="flex:1">Açtım, günlüğe yaz</button><button class="btn sec" id="sPass" style="width:110px">Pas geç</button></div>':'<button class="btn sec" id="sClose">Kapat</button>'));
+ var tf=s.type==='ORB'?5:15;drawChart($('schart'),s.inst,tf,{bb:s.type==='BBO',st:s.type==='ST',orb:s.type==='ORB',orbAt:s.t,sig:s,markers:[s],from:s.t-(tf===15?40:30)*tf*60000,to:s.t+12*tf*60000});
  var o=$('sOpen');if(o)o.onclick=function(){s.st='açıldı';S.journal.unshift({id:Date.now().toString(36),inst:s.inst,type:s.type,side:s.side,entry:s.entry,stop:s.stop,lot:l?l.lot:0,openedAt:Date.now(),exit:null,pnl:0});save();closeSheet();render();toast('Günlüğe yazıldı')};
  var p=$('sPass');if(p)p.onclick=function(){s.st='pas';save();closeSheet();render()};
  var c=$('sClose');if(c)c.onclick=closeSheet}
@@ -271,7 +308,9 @@ function vAyar(){var h='<h2>Sinyal seçimi</h2><div class="sm mut" style="margin
  return h}
 
 function render(){document.querySelectorAll('nav button').forEach(function(b){b.classList.toggle('on',b.dataset.t===tab)});
- var v={ana:vAna,sinyal:vSinyal,hesap:vHesap,gunluk:vGunluk,ayar:vAyar}[tab]();$('main').innerHTML=v;bind()}
+ killCharts();var v={ana:vAna,sinyal:vSinyal,grafik:vGrafik,hesap:vHesap,gunluk:vGunluk,ayar:vAyar}[tab]();$('main').innerHTML=v;bind();
+ if(tab==='grafik'&&!BARS[gopt.inst]&&S.apiKey&&!fetching)poll(true);
+ if(tab==='grafik')drawChart($('gchart'),gopt.inst,gopt.tf,{bb:gopt.bb,st:gopt.st,orb:gopt.orb,markers:S.signals.filter(function(g){return g.inst===gopt.inst})})}
 function bind(){var m=$('main');
  m.querySelectorAll('[data-sig]').forEach(function(e){e.onclick=function(){sigSheet(e.dataset.sig)}});
  m.querySelectorAll('[data-j]').forEach(function(e){e.onclick=function(){jSheet(e.dataset.j)}});
@@ -285,6 +324,9 @@ function bind(){var m=$('main');
  m.querySelectorAll('[data-con]').forEach(function(e){e.onchange=function(){var v=num(e.value);if(!(v>0))return toast('Sayı gir');S.contract[e.dataset.con]=v;save();toast('Kaydedildi')}});
  var ak=$('aKey');if(ak)ak.onchange=function(){S.apiKey=ak.value.trim();save();toast('Anahtar kaydedildi');poll(true)};
  var pn=$('pollNow');if(pn)pn.onclick=function(){poll(true);toast('Kontrol ediliyor…')};
+ m.querySelectorAll('[data-gi]').forEach(function(e){e.onclick=function(){gopt.inst=e.dataset.gi;render()}});
+ m.querySelectorAll('[data-gt]').forEach(function(e){e.onclick=function(){gopt.tf=+e.dataset.gt;render()}});
+ m.querySelectorAll('[data-gx]').forEach(function(e){e.onclick=function(){gopt[e.dataset.gx]=!gopt[e.dataset.gx];render()}});
  var bs=$('bkS');if(bs)bs.onclick=shareBackup;
  var bl=$('bkL');if(bl)bl.onchange=function(){var f=bl.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var o=JSON.parse(r.result);S=Object.assign(defaults(),o.data||o);save();render();toast('Yedek yüklendi')}catch(e){toast('Yedek okunamadı')}};r.readAsText(f)};
 }
@@ -294,7 +336,7 @@ async function shareBackup(){var blob=new Blob([JSON.stringify({app:'fxtetik',at
 document.querySelectorAll('nav button').forEach(function(b){b.onclick=function(){tab=b.dataset.t;render();window.scrollTo(0,0)}});
 document.addEventListener('visibilitychange',function(){if(!document.hidden){poll();render()}});
 try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}catch(e){}
-window.__fx={detect:detect,lot:lot,S:function(){return S},zoned:zoned};
+window.__fx={poll:poll,detect:detect,lot:lot,S:function(){return S},zoned:zoned};
 render();poll();schedule();setInterval(function(){if(tab==='ana')render()},60000);
 })();
 </script>
