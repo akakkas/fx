@@ -178,6 +178,9 @@ function detect(inst,b5,now){var sigs=[];var tf=15*60000;
 function mk(inst,type,side,entry,stop,t,why){var risk=Math.abs(entry-stop),sg=side==='L'?1:-1;
  return{id:inst+'-'+type+'-'+t,inst:inst,type:type,side:side,entry:entry,stop:stop,tp1:entry+sg*risk,tp2:entry+sg*2*risk,t:t,why:why,st:'yeni'}}
 
+/* hafta sonu ve ölü (hareketsiz) mumları at: veri sağlayıcı piyasa kapalıyken düz mum dolduruyor, bu hem grafiği hem ATR/ST'yi bozar */
+function temiz(b){return b.filter(function(x){var d=new Date(x.t),wd=d.getUTCDay(),h=d.getUTCHours();
+ if(wd===6||(wd===0&&h<21)||(wd===5&&h>=22))return false;return x.h>x.l})}
 var fetching=false;
 async function poll(force){
  if(fetching)return;var feeds=Object.keys(INST).filter(function(k){return INST[k].feed});
@@ -187,12 +190,12 @@ async function poll(force){
  if(S.credits.n+feeds.length>780){toast('Günlük ücretsiz veri sınırı doldu');return}
   fetching=true;
  try{
-  var url='https://api.twelvedata.com/time_series?interval=5min&outputsize=300&timezone=UTC&order=ASC&apikey='+encodeURIComponent(S.apiKey)+'&symbol='+feeds.map(function(k){return INST[k].feed}).join(',');
+  var url='https://api.twelvedata.com/time_series?interval=5min&outputsize=1200&timezone=UTC&order=ASC&apikey='+encodeURIComponent(S.apiKey)+'&symbol='+feeds.map(function(k){return INST[k].feed}).join(',');
   var res=await fetch(url);var js=await res.json();S.credits.n+=feeds.length;
   var now=Date.now(),fresh=[];
   feeds.forEach(function(k){var o=feeds.length>1?js[INST[k].feed]:js;
    if(!o||o.status==='error'||!o.values){if(o&&o.message)toast('Veri hatası: '+o.message.slice(0,60));return}
-   var b5=o.values.map(function(v){return{t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}});
+   var b5=temiz(o.values.map(function(v){return{t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}}));
    BARS[k]=b5;S.bars[k]=b5.map(function(x){return[x.t,x.o,x.h,x.l,x.c]});var last=b5[b5.length-1];S.prices[k]={p:last.c,ch:b5.length>288?(last.c/b5[b5.length-289].c-1)*100:null,t:last.t};
    detect(k,b5,now).forEach(function(s){if(!S.signals.some(function(x){return x.id===s.id})){var hb=haberEngel(s.inst,s.t);
     if(hb){s.st='haber';s.hab=hb.ad}else{var bg=haberBugun(s.inst,s.t);if(bg.length)s.hgun=bg.map(function(e){return e.ad+' '+hTR(e.t)}).join(', ')}

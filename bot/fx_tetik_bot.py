@@ -201,8 +201,20 @@ def durum_yaz(s):
     json.dump(s, open(DURUM, "w"))
 
 
+def temiz(b):
+    """Hafta sonu ve ölü (hareketsiz) mumları at — uygulamadaki temiz() ile aynı."""
+    out = []
+    for x in b:
+        d = dt.datetime.fromtimestamp(x["t"] / 1000, dt.timezone.utc)
+        if d.weekday() == 5 or (d.weekday() == 6 and d.hour < 21) or (d.weekday() == 4 and d.hour >= 22):
+            continue
+        if x["h"] > x["l"]:
+            out.append(x)
+    return out
+
+
 def cek(key, feeds):
-    q = urllib.parse.urlencode({"symbol": ",".join(feeds), "interval": "5min", "outputsize": 300,
+    q = urllib.parse.urlencode({"symbol": ",".join(feeds), "interval": "5min", "outputsize": 1200,
                                 "timezone": "UTC", "order": "ASC", "apikey": key})
     with urllib.request.urlopen("https://api.twelvedata.com/time_series?" + q, timeout=30) as r:
         js = json.load(r)
@@ -212,9 +224,9 @@ def cek(key, feeds):
         if not o or o.get("status") == "error" or not o.get("values"):
             print("veri hatası", k, (o or {}).get("message", "")[:80], flush=True)
             continue
-        out[k] = [{"t": int(dt.datetime.fromisoformat(v["datetime"].replace(" ", "T") + "+00:00").timestamp() * 1000),
-                   "o": float(v["open"]), "h": float(v["high"]), "l": float(v["low"]), "c": float(v["close"])}
-                  for v in o["values"]]
+        out[k] = temiz([{"t": int(dt.datetime.fromisoformat(v["datetime"].replace(" ", "T") + "+00:00").timestamp() * 1000),
+                         "o": float(v["open"]), "h": float(v["high"]), "l": float(v["low"]), "c": float(v["close"])}
+                        for v in o["values"]])
     return out
 
 
