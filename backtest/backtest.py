@@ -40,7 +40,9 @@ OOS_FROM = 2023      # 2023 ve sonrası: örneklem dışı kontrol
 
 
 def load(sym):
-    df = pd.read_parquet(os.path.join(DATA, f"{sym}.parquet"))
+    import glob
+    df = pd.concat(pd.read_parquet(f) for f in sorted(glob.glob(os.path.join(DATA, f"{sym}_*.parquet")))).sort_index()
+    df = df[~df.index.duplicated()]
     out = pd.DataFrame(index=df.index)
     for k in "ohlc":
         out[k] = (df["b" + k] + df["a" + k]) / 2

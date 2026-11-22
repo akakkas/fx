@@ -26,11 +26,11 @@ URL = "https://datafeed.dukascopy.com/datafeed/{s}/{y}/{m:02d}/{d:02d}/{side}_ca
 OUT = os.path.join(os.path.dirname(__file__), "data")
 
 
-def get(url, tries=4):
+def get(url, tries=3):
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=15) as r:
                 return r.read()
         except urllib.error.HTTPError as e:
             if e.code == 404:
@@ -96,24 +96,33 @@ def main(symbols):
     os.makedirs(OUT, exist_ok=True)
     days = [START + dt.timedelta(days=i) for i in range((END - START).days + 1)]
     days = [d for d in days if d.weekday() < 5]
+    years = sorted({d.year for d in days})
     for sym in symbols:
-        path = os.path.join(OUT, f"{sym}.parquet")
-        if os.path.exists(path):
-            print(sym, "önbellekte var, atlanıyor", flush=True)
-            continue
-        parts, stats = [], {"ok": 0, "empty": 0, "err": 0}
-        t0 = time.time()
-        with cf.ThreadPoolExecutor(12) as ex:
-            for day, df, st in ex.map(lambda d: fetch_day(sym, d), days):
-                stats[st] += 1
-                if df is not None and len(df):
-                    parts.append(df)
-        full = pd.concat(parts).sort_index()
-        k = scale(full, *SYMBOLS[sym])
-        for c in ["bo", "bh", "bl", "bc", "ao", "ah", "al", "ac"]:
-            full[c] = full[c].astype(float) / k
-        full.to_parquet(path)
-        print(f"{sym}: {len(full)} dakika, ölçek={k}, {stats}, {time.time()-t0:.0f} sn", flush=True)
+        k = None
+        for y in years:
+            path = os.path.join(OUT, f"{sym}_{y}.parquet")
+            if os.path.exists(path) and y != END.year:
+                print(sym, y, "önbellekte", flush=True)
+                continue
+            yd = [d for d in days if d.year == y]
+            parts, stats = [], {"ok": 0, "empty": 0, "err": 0}
+            t0 = time.time()
+            with cf.ThreadPoolExecutor(24) as ex:
+                for i, (day, df, st) in enumerate(ex.map(lambda d: fetch_day(sym, d), yd)):
+                    stats[st] += 1
+                    if df is not None and len(df):
+                        parts.append(df)
+                    if (i + 1) % 50 == 0:
+                        print(f"  {sym} {y}: {i+1}/{len(yd)} gün {stats} {time.time()-t0:.0f} sn", flush=True)
+            if not parts:
+                print(sym, y, "veri yok", stats, flush=True)
+                continue
+            full = pd.concat(parts).sort_index()
+            k = k or scale(full, *SYMBOLS[sym])
+            for c in ["bo", "bh", "bl", "bc", "ao", "ah", "al", "ac"]:
+                full[c] = full[c].astype(float) / k
+            full.to_parquet(path)
+            print(f"{sym} {y}: {len(full)} dakika, ölçek={k}, {stats}, {time.time()-t0:.0f} sn", flush=True)
 
 
 if __name__ == "__main__":

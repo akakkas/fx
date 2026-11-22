@@ -5,21 +5,51 @@ on:
     paths: ["backtest/**", ".github/workflows/geritest.yml"]
 permissions:
   contents: write
+concurrency: {group: geritest, cancel-in-progress: true}
 jobs:
-  test:
+  veri:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        sym: [XAUUSD, XAGUSD, DEUIDXEUR, USATECHIDXUSD]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install pandas numpy pyarrow
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: backtest/data
-          key: dukascopy-${{ hashFiles('backtest/fetch.py') }}
+          key: duka-${{ matrix.sym }}-${{ github.run_id }}
+          restore-keys: duka-${{ matrix.sym }}-
       - name: Veri indir
-        run: python backtest/fetch.py
+        run: python backtest/fetch.py ${{ matrix.sym }}
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: backtest/data
+          key: duka-${{ matrix.sym }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: veri-${{ matrix.sym }}
+          path: backtest/data
+          retention-days: 3
+  test:
+    needs: veri
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy pyarrow
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: veri-*
+          path: backtest/data
+          merge-multiple: true
       - name: Geri test
         run: python backtest/backtest.py
       - name: Sonuçları kaydet
