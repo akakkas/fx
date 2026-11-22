@@ -179,11 +179,12 @@ function mk(inst,type,side,entry,stop,t,why){var risk=Math.abs(entry-stop),sg=si
  return{id:inst+'-'+type+'-'+t,inst:inst,type:type,side:side,entry:entry,stop:stop,tp1:entry+sg*risk,tp2:entry+sg*2*risk,t:t,why:why,st:'yeni'}}
 
 /* hafta sonu ve ölü (hareketsiz) mumları at: veri sağlayıcı piyasa kapalıyken düz mum dolduruyor, bu hem grafiği hem ATR/ST'yi bozar */
+function feedOk(k){return !!INST[k].feed&&!(S.planYok&&S.planYok[k])}
 function temiz(b){return b.filter(function(x){var d=new Date(x.t),wd=d.getUTCDay(),h=d.getUTCHours();
  if(wd===6||(wd===0&&h<21)||(wd===5&&h>=22))return false;return x.h>x.l})}
 var fetching=false;
 async function poll(force){
- if(fetching)return;var feeds=Object.keys(INST).filter(function(k){return INST[k].feed});
+ if(fetching)return;var feeds=Object.keys(INST).filter(feedOk);
  if(!S.apiKey){render();return}
  var d=new Date(),wd=d.getUTCDay();if((wd===6||(wd===0&&d.getUTCHours()<22))&&!force)return;
  if(S.credits.d!==today())S.credits={d:today(),n:0};
@@ -194,7 +195,7 @@ async function poll(force){
   var res=await fetch(url);var js=await res.json();S.credits.n+=feeds.length;
   var now=Date.now(),fresh=[];
   feeds.forEach(function(k){var o=feeds.length>1?js[INST[k].feed]:js;
-   if(!o||o.status==='error'||!o.values){if(o&&o.message)toast('Veri hatası: '+o.message.slice(0,60));return}
+   if(!o||o.status==='error'||!o.values){if(o&&/not available with your plan/i.test(o.message||'')){S.planYok=S.planYok||{};S.planYok[k]=true;toast(INST[k].ad+': ücretsiz veri planında yok, bundan sonra istenmeyecek')}else if(o&&o.message)toast('Veri hatası: '+o.message.slice(0,60));return}
    var b5=temiz(o.values.map(function(v){return{t:Date.parse(v.datetime.replace(' ','T')+'Z'),o:+v.open,h:+v.high,l:+v.low,c:+v.close}}));
    BARS[k]=b5;S.bars[k]=b5.map(function(x){return[x.t,x.o,x.h,x.l,x.c]});var last=b5[b5.length-1];S.prices[k]={p:last.c,ch:b5.length>288?(last.c/b5[b5.length-289].c-1)*100:null,t:last.t};
    detect(k,b5,now).forEach(function(s){if(!S.signals.some(function(x){return x.id===s.id})){var hb=haberEngel(s.inst,s.t);
@@ -274,7 +275,7 @@ function vAna(){var eq=equity(),tp=todayPnl(),loss=Math.max(0,-tp),orisk=openRis
  h+='<h2>Son sinyaller<a href="#" data-go="sinyal" class="sm acc" style="text-decoration:none">Tümü</a></h2>'+(list.length?list.map(sigCard).join(''):'<div class="card empty">Henüz sinyal yok. Açık sinyal türlerin: '+(activeList()||'hiçbiri')+'</div>');
  h+=vHaber();
  h+='<h2>Piyasalar<span class="sm mut">'+(S.lastFetch?'son: '+hm(new Date(S.lastFetch)):'')+'</span></h2><div class="card" style="padding:4px 14px">'+Object.keys(INST).map(function(k){var p=S.prices[k];
-  return '<div class="li"><b>'+INST[k].ad+'</b><span>'+(p?px(k,p.p)+(p.ch!=null?' <span class="sm '+(p.ch>=0?'up':'dn')+'">'+(p.ch>=0?'▲ ':'▼ ')+nf(Math.abs(p.ch),1)+'%</span>':''):INST[k].feed?'<span class="mut sm">—</span>':'<span class="mut sm">canlı veri yok</span>')+'</span></div>'}).join('')+'</div>';
+  return '<div class="li"><b>'+INST[k].ad+'</b><span>'+(p?px(k,p.p)+(p.ch!=null?' <span class="sm '+(p.ch>=0?'up':'dn')+'">'+(p.ch>=0?'▲ ':'▼ ')+nf(Math.abs(p.ch),1)+'%</span>':''):feedOk(k)?'<span class="mut sm">—</span>':'<span class="mut sm">canlı veri yok</span>')+'</span></div>'}).join('')+'</div>';
  return h}
 function activeList(){var a=[];Object.keys(INST).forEach(function(k){TYPES.forEach(function(t){if(S.on[k][t])a.push(INST[k].ad+' '+t)})});return a.join(', ')}
 function vSinyal(){return '<h2>Sinyaller<span class="sm mut">'+S.signals.length+'</span></h2>'+(S.signals.length?S.signals.map(sigCard).join(''):'<div class="card empty">Sinyal geldikçe burada listelenir.</div>')+
@@ -340,8 +341,8 @@ function jSheet(id){var j=S.journal.find(function(x){return x.id===id});if(!j)re
  var armed=false;$('jDel').onclick=function(){if(!armed){armed=true;this.textContent='Emin misin? Tekrar bas';return}S.journal=S.journal.filter(function(x){return x.id!==id});save();closeSheet();render()};
  $('jNo').onclick=closeSheet}
 function vAyar(){var h='<h2>Sinyal seçimi</h2><div class="sm mut" style="margin:-4px 4px 8px">Altındaki rakam 6 yıllık testteki işlem başı net sonuç.</div><div class="card">';
- Object.keys(INST).forEach(function(k,i){h+='<div style="'+(i?'border-top:1px solid var(--line);':'')+'padding:10px 0"><div class="row" style="margin-bottom:8px"><b>'+INST[k].ad+'</b>'+(INST[k].feed?'':'<span class="sm mut">canlı veri yok, sinyal gelmez</span>')+'</div><div class="pick">'+
-  TYPES.map(function(t){var kk=KARNE[k][t];return '<button data-on="'+k+'.'+t+'" aria-pressed="'+S.on[k][t]+'" class="'+(S.on[k][t]?'on':'')+'"'+(INST[k].feed?'':' disabled style="opacity:.45"')+'><b>'+t+'</b><span class="'+(kk==null?'':kk<0?'dn':'')+'">'+(kk==null?'test sürüyor':(kk>=0?'+':'−')+nf(Math.abs(kk),2)+'R')+'</span></button>'}).join('')+'</div></div>'});
+ Object.keys(INST).forEach(function(k,i){h+='<div style="'+(i?'border-top:1px solid var(--line);':'')+'padding:10px 0"><div class="row" style="margin-bottom:8px"><b>'+INST[k].ad+'</b>'+(feedOk(k)?'':'<span class="sm mut">canlı veri yok, sinyal gelmez</span>')+'</div><div class="pick">'+
+  TYPES.map(function(t){var kk=KARNE[k][t];return '<button data-on="'+k+'.'+t+'" aria-pressed="'+S.on[k][t]+'" class="'+(S.on[k][t]?'on':'')+'"'+(feedOk(k)?'':' disabled style="opacity:.45"')+'><b>'+t+'</b><span class="'+(kk==null?'':kk<0?'dn':'')+'">'+(kk==null?'test sürüyor':(kk>=0?'+':'−')+nf(Math.abs(kk),2)+'R')+'</span></button>'}).join('')+'</div></div>'});
  h+='</div><h2>Risk</h2><div class="card"><div class="g2"><label>Başlangıç kasası ($)<input data-set="kasa" inputmode="decimal" value="'+S.kasa+'"></label><label>İşlem başı risk ($)<input data-set="risk" inputmode="decimal" value="'+S.risk+'"></label><label>Günlük kayıp sınırı ($)<input data-set="limit" inputmode="decimal" value="'+S.limit+'"></label><label>Toplam açık risk sınırı ($)<input data-set="openLimit" inputmode="decimal" value="'+S.openLimit+'"></label></div></div>';
  h+='<h2>Kontrat büyüklükleri</h2><div class="card"><div class="sm mut" style="margin-bottom:8px">MT5\'te enstrümana basılı tut → Özellikler → Kontrat büyüklüğü</div><div class="g2">'+Object.keys(INST).map(function(k){return '<label>'+INST[k].ad+' (1 lot)<input data-con="'+k+'" inputmode="decimal" value="'+S.contract[k]+'"></label>'}).join('')+'<label>EUR/USD (DAX için)<input data-set="eurusd" inputmode="decimal" value="'+S.eurusd+'"></label></div></div>';
  h+='<h2>Veri</h2><div class="card"><label>Twelve Data API anahtarı (ücretsiz)<input id="aKey" value="'+esc(S.apiKey)+'" placeholder="twelvedata.com → kayıt ol → API key" autocomplete="off"></label><div class="sm mut">Bugün kullanılan: '+(S.credits.d===today()?S.credits.n:0)+' / 800 istek. Uygulama açıkken 5 dakikada bir kontrol eder.</div>'+
