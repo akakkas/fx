@@ -218,7 +218,7 @@ $('bell').onclick=async function(){if(!('Notification' in window))return toast('
 
 
 /* ---------- grafik ---------- */
-var BARS={};Object.keys(S.bars||{}).forEach(function(k){BARS[k]=S.bars[k].map(function(a){return{t:a[0],o:a[1],h:a[2],l:a[3],c:a[4]}})});
+var gforced=false,BARS={};Object.keys(S.bars||{}).forEach(function(k){BARS[k]=temiz(S.bars[k].map(function(a){return{t:a[0],o:a[1],h:a[2],l:a[3],c:a[4]}}));if(BARS[k].length){var lb=BARS[k][BARS[k].length-1];if(S.prices[k])S.prices[k].p=lb.c}});
 var TV={XAU:'OANDA:XAUUSD',XAG:'OANDA:XAGUSD',DAX:'OANDA:DE30EUR',NAS:'OANDA:NAS100USD'};
 function tvLink(inst){return '<a class="tvbtn" href="https://www.tradingview.com/chart/?symbol='+encodeURIComponent(TV[inst])+'" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>TradingView\'de aç</a>'}
 var LWC=null,CHARTS=[],SCH=null;
@@ -349,7 +349,7 @@ function vAyar(){var h='<h2>Sinyal seçimi</h2><div class="sm mut" style="margin
 
 function render(){document.querySelectorAll('nav button').forEach(function(b){b.classList.toggle('on',b.dataset.t===tab)});
  killCharts();var v={ana:vAna,sinyal:vSinyal,grafik:vGrafik,hesap:vHesap,gunluk:vGunluk,ayar:vAyar}[tab]();$('main').innerHTML=v;bind();
- if(tab==='grafik'&&!BARS[gopt.inst]&&S.apiKey&&!fetching)poll(true);
+ if(tab==='grafik'&&(!BARS[gopt.inst]||!(BARS[gopt.inst].length>=300)||Date.now()-S.lastFetch>30*60000)&&S.apiKey&&!fetching&&!gforced){gforced=true;poll(true)}
  if(tab==='grafik')drawChart($('gchart'),gopt.inst,gopt.tf,{bb:gopt.bb,st:gopt.st,orb:gopt.orb,markers:S.signals.filter(function(g){return g.inst===gopt.inst})})}
 function bind(){var m=$('main');
  m.querySelectorAll('[data-sig]').forEach(function(e){e.onclick=function(){sigSheet(e.dataset.sig)}});
