@@ -163,10 +163,11 @@ function detect(inst,b5,now){var sigs=[];var tf=15*60000;
  var b5c=indicators(b5.filter(function(x){return x.t+300000<=now}).map(function(x){return Object.assign({},x)}));
  var on=S.on[inst];
  if(b15.length>25){var r=b15[b15.length-1],p=b15[b15.length-2];var closeT=r.t+tf;
+  var b60=S.uyum1s===false?[]:indicators(agg(b5.map(function(x){return Object.assign({},x)}),60).filter(function(x){return x.t+3600000<=closeT}));var y1=b60.length>11?b60[b60.length-1].dir:0;
   if(now-closeT<20*60000){
    if(on.BBO&&r.mid){var side=null;if(r.c>r.up&&p.c<=p.up)side='L';else if(r.c<r.dn&&p.c>=p.dn)side='S';
     if(side&&Math.abs(r.c-r.mid)>0.3*r.atr)sigs.push(mk(inst,'BBO',side,r.c,r.mid,closeT,'Bollinger '+(side==='L'?'üst':'alt')+' bandı kırıldı. Stop orta bantta; yarısı 1R\'da, kalanı mum orta bandın öbür tarafında kapanınca.'))}
-   if(on.ST&&r.dir!==p.dir){var s2=r.dir===1?'L':'S';if(Math.abs(r.c-r.st)>0.3*r.atr)sigs.push(mk(inst,'ST',s2,r.c,r.st,closeT,'Supertrend '+(s2==='L'?'yukarı':'aşağı')+' döndü. Stop ST çizgisinde; yarısı 1R\'da, kalanı ST tersine dönünce.'))}
+   if(on.ST&&r.dir!==p.dir&&(S.uyum1s===false||y1===r.dir)){var s2=r.dir===1?'L':'S';if(Math.abs(r.c-r.st)>0.3*r.atr)sigs.push(mk(inst,'ST',s2,r.c,r.st,closeT,'Supertrend '+(s2==='L'?'yukarı':'aşağı')+' döndü, 1 saatlik ST de aynı yönde. Stop ST çizgisinde; yarısı 1R\'da, kalanı ST tersine dönünce.'))}
   }}
  if(on.ORB&&b5c.length>20){var w=ORBW[inst];var o=zoned(w[0],w[1],now);if(now>=o+15*60000&&now<=o+80*60000){
   var rng=b5c.filter(function(x){return x.t>=o&&x.t<o+15*60000});

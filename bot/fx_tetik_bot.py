@@ -27,6 +27,7 @@ ACIK = {  # hangi sinyal türleri açık
     "XAG": {"BBO": False, "ST": False, "ORB": False},
 }
 RISK_USD = 100          # işlem başı risk (lot hesabı için)
+UYUM_1S = True          # ST sinyali sadece 1 saatlik ST de aynı yöndeyse (testte en iyi sonuç)
 GECE = True             # seans dışı (gece) sinyalleri de bildir — DİKKAT: gece saatleri test edilmedi
 TELEGRAM = (os.environ.get("TG_TOKEN"), os.environ.get("TG_CHAT"))  # isteğe bağlı
 
@@ -161,6 +162,12 @@ def detect(inst, b5, now):
     b15 = indicators([x for x in agg(b5, 15) if x["t"] + tf <= now])
     b5c = indicators([dict(x) for x in b5 if x["t"] + 300000 <= now])
     on = ACIK[inst]
+    b60 = indicators([x for x in agg(b5, 60) if x["t"] + 3600000 <= now]) if UYUM_1S else []
+
+    def yon_1s(t_kapanis):
+        """t anında kapanmış son 1 saatlik mumun ST yönü."""
+        d = [x for x in b60 if x["t"] + 3600000 <= t_kapanis]
+        return d[-1]["dir"] if len(d) > 11 else 0
     for j in (-1, -2, -3):  # son 3 kapanmış mum: veri gecikirse dönüş kaçmasın (aynı sinyal ID ile bir kez bildirilir)
         if len(b15) <= 25 - j:
             break
@@ -171,10 +178,10 @@ def detect(inst, b5, now):
                 side = "L" if (r["c"] > r["up"] and p["c"] <= p["up"]) else "S" if (r["c"] < r["dn"] and p["c"] >= p["dn"]) else None
                 if side and abs(r["c"] - r["mid"]) > 0.3 * r["atr"]:
                     sigs.append(mk(inst, "BBO", side, r["c"], r["mid"], close_t, "Bollinger kırılımı, stop orta bant"))
-            if on["ST"] and r["dir"] != p["dir"]:
+            if on["ST"] and r["dir"] != p["dir"] and (not UYUM_1S or yon_1s(close_t) == r["dir"]):
                 s2 = "L" if r["dir"] == 1 else "S"
                 if abs(r["c"] - r["st"]) > 0.3 * r["atr"]:
-                    sigs.append(mk(inst, "ST", s2, r["c"], r["st"], close_t, "Supertrend döndü, stop ST çizgisi"))
+                    sigs.append(mk(inst, "ST", s2, r["c"], r["st"], close_t, "Supertrend döndü" + (", 1s ST uyumlu" if UYUM_1S else "") + ", stop ST çizgisi"))
     if on["ORB"] and len(b5c) > 20:
         tz, hh = ORBW[inst]
         o = zoned(tz, hh, now)
@@ -315,7 +322,7 @@ def main():
     if not key:
         sys.exit("TD_KEY yok. ~/.bashrc'ye ekle: export TD_KEY=\"anahtarin\"")
     st = durum_oku()
-    print("FX Tetik nöbette. Açık sinyaller:", {k: [t for t, v in d.items() if v] for k, d in ACIK.items()}, "· gece:", GECE, flush=True)
+    print("FX Tetik nöbette. Açık sinyaller:", {k: [t for t, v in d.items() if v] for k, d in ACIK.items()}, "· 1s uyum:", UYUM_1S, "· gece:", GECE, flush=True)
     while True:
         try:
             tur(key, st)
